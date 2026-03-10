@@ -1,0 +1,23 @@
+
+# simulation
+work/
+*.wlf
+*.vcd
+*.mpf
+*.cr.mti
+transcript
+
+# synthesis
+*.mr
+*.syn
+*.pvl
+
+# logs
+*.log
+
+# backup
+*~
+
+# libraries
+std_cells/
+

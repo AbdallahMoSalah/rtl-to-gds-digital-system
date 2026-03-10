@@ -1,0 +1,153 @@
+`timescale 1us/1ns
+
+module UART_TX_TB ();
+    parameter Width      = 8;
+    parameter CLK_PERIOD = 8.68; 
+    
+reg                  		CLK_TB;
+reg                  		n_RST_TB;
+reg     [Width-1:0]         P_DATA_TB;
+reg                  		Data_Valid_TB;
+reg                 		parity_enable_TB;
+reg                 		parity_type_TB; 
+wire                		TX_OUT_TB;
+wire                		busy_TB;
+
+
+UART_TX DUT (
+.clk(CLK_TB),
+.n_RST(n_RST_TB),
+.P_DATA(P_DATA_TB),
+.Data_Valid(Data_Valid_TB),
+.PAR_EN(parity_enable_TB),
+.PAR_TYP(parity_type_TB),
+.TX_OUT(TX_OUT_TB), 
+.busy(busy_TB)
+);
+
+always #(CLK_PERIOD/2) CLK_TB = ~CLK_TB ; //clock generation 
+
+
+initial begin
+	initialize();
+	reset();
+	
+        /////////////test case 1(no parity)/////////////////////
+		UART_CONFG(0,0);
+        DATA_IN(8'b0000_0001);
+		check_output(8'b0000_0001,0);
+		
+		//////////////test case 2(no parity go to idle)/////////////////////
+		UART_CONFG(0,0);
+        DATA_IN(8'b0000_0011);
+		check_output(8'b0000_0011,1);
+		#(1*CLK_PERIOD)
+		//////////////test case 3(even parity)/////////////////////
+		UART_CONFG(1,0);
+        DATA_IN(8'b0000_0111);
+		check_output(8'b0000_0111,2);
+		//////////////test case 4(odd parity)/////////////////////
+		UART_CONFG(1,1);
+        DATA_IN(8'b0101_0101);
+		check_output(8'b0101_0101,3);
+		
+		//////////////test case 5(odd parity)/////////////////////
+		UART_CONFG(1,1);
+        DATA_IN(8'b1111_1111);
+		check_output(8'b1111_1111,4);
+		$stop;
+end
+
+///////////////// tasks ///////////////
+
+task initialize ;
+  begin
+	CLK_TB            = 1'b0   ;
+	n_RST_TB          = 1'b1   ;    // rst is deactivated
+	P_DATA_TB         = 8'h00  ;
+	parity_enable_TB  = 1'b0   ;
+	parity_type_TB    = 1'b0   ;
+	Data_Valid_TB     = 1'b0   ;
+  end
+endtask
+
+task reset;
+begin
+    #(CLK_PERIOD)
+	n_RST_TB  = 1'b0;           // rst is activated
+	#(CLK_PERIOD)
+	n_RST_TB  = 1'b1;
+	#(CLK_PERIOD) ;
+  end
+endtask
+
+task UART_CONFG ;
+  input                   PAR_EN ;
+  input                   PAR_TYP ;
+
+  begin
+	parity_enable_TB  = PAR_EN   ;
+	parity_type_TB    = PAR_TYP   ;
+  end
+endtask
+
+task DATA_IN;
+  input [7:0]P_DATA;
+begin
+P_DATA_TB=P_DATA;
+Data_Valid_TB=1;
+#(CLK_PERIOD)
+Data_Valid_TB=0;     
+end
+endtask
+
+
+task check_output;
+  input [7:0]DATA_c;
+  input [2:0]Test_Case;
+  integer i;
+  reg [10:0] Expected_Out,Real_Out;
+  reg parity_bit;
+begin	
+	if (busy_TB) begin
+		
+		for (i=0 ;i<(10+parity_enable_TB) ;i=i+1) begin
+	@(negedge CLK_TB)		Real_Out[i]=TX_OUT_TB;
+	end	
+	end
+	if (parity_enable_TB) begin
+		if (parity_type_TB) 
+			parity_bit = ~^DATA_c;
+		else
+			parity_bit = ^DATA_c;
+	end
+	else
+			parity_bit = 1'b1;	
+		
+    if(parity_enable_TB) begin
+		Expected_Out = {1'b1,parity_bit,DATA_c,1'b0} ;
+	if(Real_Out == Expected_Out) 
+		begin
+			$display("Test Case %d is succeeded",Test_Case);
+		end
+		else
+		begin
+			$display("Test Case %d is failed", Test_Case);
+		end
+	end
+	else begin
+		Expected_Out = {1'b1,1'b1,DATA_c,1'b0} ;
+			if(Real_Out[9:0] == Expected_Out[9:0]) 
+		begin
+			$display("Test Case %d is succeeded",Test_Case);
+		end
+		else
+		begin
+			$display("Test Case %d is failed", Test_Case);
+		end
+	
+	end
+		end
+
+endtask
+endmodule

@@ -1,0 +1,99 @@
+module FSM (
+    input clk,n_RST,
+    input PAR_EN,
+    input Data_Valid,
+    input ser_done,
+    output reg ser_en,
+    output reg busy,
+    output reg [1:0] mux_sel,
+    output reg idle_flag
+);
+  /*  localparam  idle=3'b000,
+                start=3'b001,
+                data=3'b010,
+                parity=3'b011,
+                stop=3'b100;*/
+typedef enum integer { 
+        idle       = 0,
+        start      = 1,
+        data       = 2,
+        parity     = 3,
+        stop       = 4
+    } state_t;
+    state_t current_state;
+    state_t next_state;
+    //reg [2:0] current_state,next_state;
+
+    always @(posedge clk or negedge n_RST) begin
+        if (!n_RST) begin
+            current_state <=idle;
+        end
+        else
+            current_state <=next_state; 
+    end
+
+
+always @(*) begin
+    idle_flag=1'b0;
+    case (current_state)
+        idle: begin
+            mux_sel=2'b10;
+            busy=1'b0;
+            ser_en=1'b0;
+            idle_flag=1'b1;
+            if (Data_Valid) begin
+                next_state =start;
+            end
+            else begin
+                next_state=idle;
+            end
+        end 
+        start: begin
+            mux_sel=2'b00;
+            busy=1'b1;
+            ser_en=1'b0;
+            next_state=data;
+        end
+        data: begin
+            mux_sel=2'b10;
+            busy=1'b1;
+            ser_en=1'b1;
+            if (ser_done) begin
+                if (PAR_EN) begin
+                    next_state=parity;
+                end
+            else begin
+                next_state=stop;
+            end
+            end
+            else begin
+                next_state=data;
+            end
+        end
+        parity: begin
+            mux_sel=2'b11;
+            busy=1'b1;
+            ser_en=1'b0;
+            next_state=stop;
+        end
+        stop: begin
+            mux_sel=2'b01;
+            busy=1'b1;
+            ser_en=1'b0;
+            idle_flag=1'b1;
+            if (Data_Valid) begin
+                next_state=start;    
+            end
+            else begin
+            next_state=idle;
+            end
+        end
+        default: begin
+            mux_sel=2'b00;
+            busy=1'b0;
+            ser_en=1'b0;
+            next_state=idle;
+        end
+    endcase
+end
+endmodule
